@@ -54,6 +54,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showStrategy, setShowStrategy] = useState(true)
+  const [showScoringRules, setShowScoringRules] = useState(false)
 
   const strategyStats = useMemo(() => {
     const aq = notes.filter((n) => n.analysis.strategy === 'acquisition')
@@ -559,6 +560,108 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* Section 5: 评分规则详解 */}
+              <div className="card p-4">
+                <button
+                  onClick={() => setShowScoringRules(!showScoringRules)}
+                  className="w-full flex items-center justify-between text-sm font-bold text-gray-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <CircleDot className="w-4 h-4 text-blue-600" /> 评分规则详解
+                  </div>
+                  <span className={`text-xs text-gray-400 transition-transform ${showScoringRules ? 'rotate-90' : ''}`}>▶</span>
+                </button>
+                {showScoringRules && (
+                  <div className="mt-3 space-y-3 text-xs">
+                    {/* Dimension 1 */}
+                    <div className="p-2.5 rounded-lg bg-red-50 border border-red-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-red-800">💬 评论购买意向</span>
+                        <span className="text-red-500 font-bold">~30%</span>
+                      </div>
+                      <div className="text-red-700 leading-relaxed">
+                        逐条分析评论内容。高意向信号（"求链接""多少钱""已下单"）→ 大幅加分；噪音信号（"博主好美""拍的什么滤镜""宝宝好可爱"）→ 扣分，说明内容种草力弱。
+                      </div>
+                    </div>
+
+                    {/* Dimension 2 */}
+                    <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-orange-800">📝 内容种草力</span>
+                        <span className="text-orange-500 font-bold">~20%</span>
+                      </div>
+                      <div className="text-orange-700 leading-relaxed">
+                        痛点是否精准（"以前要兑水温摸黑找工具"）、体验是否具体（温差&lt;1℃/静音&lt;60db）、是否有信任建设（"用了三个月才来评""退了两台才找到它"）。
+                      </div>
+                    </div>
+
+                    {/* Dimension 3 */}
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-amber-800">🏷️ 品牌关联度</span>
+                        <span className="text-amber-500 font-bold">~15%</span>
+                      </div>
+                      <div className="text-amber-700 leading-relaxed">
+                        推荐 BOLOLO → 直接加分；推荐竞品但评论区有人问 BOLOLO → 截流加分；闲置转让/退货/投诉 → <strong>一票否决</strong>，评分压在 40 以下。
+                      </div>
+                    </div>
+
+                    {/* Dimension 4 */}
+                    <div className="p-2.5 rounded-lg bg-yellow-50 border border-yellow-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-yellow-800">📊 互动结构</span>
+                        <span className="text-yellow-500 font-bold">~12%</span>
+                      </div>
+                      <div className="text-yellow-700 leading-relaxed">
+                        不只看绝对值。收藏/点赞比 &gt; 0.5（用户存下来做决策）→ 加分；万赞零评 → 疑似刷量；评论全是打卡表情 → 无效互动。
+                      </div>
+                    </div>
+
+                    {/* Dimension 5 */}
+                    <div className="p-2.5 rounded-lg bg-green-50 border border-green-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-green-800">🔑 关键词覆盖</span>
+                        <span className="text-green-500 font-bold">~10%</span>
+                      </div>
+                      <div className="text-green-700 leading-relaxed">
+                        高价值词（"怎么选""推荐""测评""对比"）→ 覆盖决策期搜索流量；低价值词（单一品牌词）→ 仅触达已知品牌用户。覆盖越丰富，投流可定向流量越大。
+                      </div>
+                    </div>
+
+                    {/* Dimension 6 */}
+                    <div className="p-2.5 rounded-lg bg-teal-50 border border-teal-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-teal-800">🎯 策略匹配度</span>
+                        <span className="text-teal-500 font-bold">~8%</span>
+                      </div>
+                      <div className="text-teal-700 leading-relaxed">
+                        避坑攻略 → 拉新+收割（收藏率极高）；横评对比 → 拉新（覆盖决策期用户）；促销内容 → 仅收割（无拉新价值）；闲置转让 → 直接不推荐。
+                      </div>
+                    </div>
+
+                    {/* Dimension 7 */}
+                    <div className="p-2.5 rounded-lg bg-gray-100 border border-gray-200">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-gray-700">⚠️ 负面信号</span>
+                        <span className="text-gray-500 font-bold">扣分项</span>
+                      </div>
+                      <div className="text-gray-600 leading-relaxed">
+                        二手转让、退货经历、质量投诉、竞品明显优于 BOLOLO 且结论一边倒 → 不论其他维度多好，直接压在 40 分以下。
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+                      <div className="text-blue-800 leading-relaxed">
+                        <strong>🤖 AI 综合判断</strong><br />
+                        7 个维度<span className="text-blue-600 font-bold"> 不是简单加权求和</span>——DeepSeek AI 模拟资深投手的判断逻辑，理解"评论都在夸博主好看≠种草成功"这类隐晦信号。<br />
+                        <span className="text-blue-500 text-xs mt-1 block">temperature: 0.3 · 同一笔记多次分析结果一致</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
