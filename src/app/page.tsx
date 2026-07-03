@@ -102,7 +102,8 @@ export default function Home() {
 
   // URL import state
   const [urlInput, setUrlInput] = useState('')
-  const [urlNoteData, setUrlNoteData] = useState<{ title: string; content: string }[]>([])
+  const [urlEditStep, setUrlEditStep] = useState(false)
+  const [urlNotesList, setUrlNotesList] = useState<{url: string; noteId: string; title: string; content: string; author: string; likes: number; collects: number; shares: number; brand: string}[]>([])
 
   // Excel import state
   const [excelInput, setExcelInput] = useState('')
@@ -158,53 +159,46 @@ export default function Home() {
   }
 
   // === URL IMPORT ===
-  async function handleUrlImport() {
+  function handleParseUrls() {
     const urls = urlInput.split('\n').filter((l) => l.trim())
     if (urls.length === 0) return
-    setAnalyzing(true)
-    setAnalyzeProgress(`正在解析 ${urls.length} 条链接...`)
-
-    // Demo: extract note ID from URL. Production would use 蒲公英API to fetch real note data.
-    const parsedNotes = urls.map((url, i) => {
+    const list = urls.map((url, i) => {
       const urlObj = url.trim()
-      // Support explore/, search_result/, discovery/item/ URL formats
       const noteIdMatch = urlObj.match(/(?:explore|search_result|discovery\/item)\/([a-f0-9]+)/)
-      const noteId = noteIdMatch ? noteIdMatch[1].slice(0, 8) : `note-${i}`
-      return {
-        id: `url-${noteId}-${Date.now()}`,
-        title: `小红书笔记 ${noteId}`,
-        content: `[Demo模式] 该笔记内容需手动补充。\n链接: ${urlObj}\n\n说明：静态网页无法抓取小红书内容（浏览器跨域限制）。接入蒲公英 API 后可自动获取笔记标题、正文、互动数据。`,
-        author: '待补充',
-        likes: 0,
-        collects: 0,
-        shares: 0,
-        comments: [] as { content: string; likes: number }[],
-        coverType: 'review' as const,
-        brandMentioned: '未提及',
-        url: urlObj,
-      }
+      const noteId = noteIdMatch ? noteIdMatch[1].slice(0, 10) : `note-${i}`
+      return { url: urlObj, noteId, title: '', content: '', author: '', likes: 0, collects: 0, shares: 0, brand: '未提及' }
     })
+    setUrlNotesList(list)
+    setUrlEditStep(true)
+  }
 
-    // Analyze each note
+  function updateUrlNote(index: number, field: string, value: any) {
+    setUrlNotesList((prev) => prev.map((n, i) => (i === index ? { ...n, [field]: value } : n)))
+  }
+
+  async function handleUrlAnalyze() {
+    if (urlNotesList.length === 0) return
+    setAnalyzing(true)
     const results: AnalyzedNote[] = []
-    for (let i = 0; i < parsedNotes.length; i++) {
-      setAnalyzeProgress(`正在分析第 ${i + 1}/${parsedNotes.length} 篇笔记...`)
+    for (let i = 0; i < urlNotesList.length; i++) {
+      const item = urlNotesList[i]
+      if (!item.title || !item.content) continue
+      setAnalyzeProgress(`正在分析第 ${i + 1}/${urlNotesList.length} 篇笔记...`)
       try {
-        const analysis = await analyzeNoteClient(parsedNotes[i])
-        results.push({ ...parsedNotes[i], analysis, analyzedAt: new Date().toISOString() })
-      } catch { /* skip failed */ }
+        const note = {
+          id: `url-${item.noteId}-${Date.now()}`,
+          title: item.title, content: item.content, author: item.author || '未知作者',
+          likes: item.likes || 0, collects: item.collects || 0, shares: item.shares || 0,
+          comments: [] as { content: string; likes: number }[],
+          coverType: 'review' as const, brandMentioned: item.brand || '未提及', url: item.url,
+        }
+        const analysis = await analyzeNoteClient(note)
+        results.push({ ...note, analysis, analyzedAt: new Date().toISOString() })
+      } catch { /* skip */ }
     }
-
-    if (results.length > 0) {
-      setNotes((prev) => [...results, ...prev])
-    } else {
-      alert('所有笔记分析失败，请检查网络或 API 配置')
-    }
-
-    setAnalyzing(false)
-    setAnalyzeProgress('')
-    setUrlInput('')
-    setShowImportModal(false)
+    if (results.length > 0) setNotes((prev) => [...results, ...prev])
+    else alert('没有可分析的笔记，请至少填写标题和内容')
+    setAnalyzing(false); setAnalyzeProgress(''); setUrlInput(''); setUrlNotesList([]); setUrlEditStep(false); setShowImportModal(false)
   }
 
   // === EXCEL IMPORT ===
@@ -820,36 +814,86 @@ export default function Home() {
             {/* === TAB: URL === */}
             {importTab === 'url' && (
               <>
-                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                    <div>
-                      粘贴小红书笔记链接，每行一条。系统将提取笔记 ID 并调用 AI 分析投流价值。<br />
-                      <span className="text-blue-500">Demo 模式：因静态网页无法爬取小红书（跨域限制），笔记标题和内容需手动补充。接入蒲公英 API 后可自动获取。</span>
+                {!urlEditStep ? (
+                  <>
+                    <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                      <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          粘贴小红书笔记链接，解析后需手动填写笔记内容，再提交 AI 分析。<br />
+                          <span className="text-blue-500">静态网页无法抓取小红书（跨域限制），接入蒲公英 API 后可跳过手动填写步骤。</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">小红书笔记链接</label>
+                        <textarea
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-40 resize-none font-mono text-xs"
+                          placeholder={`https://www.xiaohongshu.com/explore/69c34f0d0000000028008b46\nhttps://www.xiaohongshu.com/search_result/68e63b060000000007003e51\n每行一条链接`}
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">支持 explore / search_result / discovery 格式，每行一条</div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">小红书笔记链接</label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-40 resize-none font-mono text-xs"
-                      placeholder={`https://www.xiaohongshu.com/explore/69c34f0d0000000028008b46\nhttps://www.xiaohongshu.com/search_result/68e63b060000000007003e51\n每行一条链接`}
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                    />
-                    <div className="text-xs text-gray-400 mt-1">每行一条链接，支持 explore / search_result / discovery 格式</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-6 border-t border-gray-100">
-                  <div className="text-xs text-gray-400">
-                    {urlInput.trim() ? `已输入 ${urlInput.split('\n').filter((l) => l.trim()).length} 条链接` : '请粘贴小红书笔记链接'}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setShowImportModal(false)} className="btn-secondary">取消</button>
-                    <button onClick={handleUrlImport} disabled={analyzing || !urlInput.trim()} className="btn-primary flex items-center gap-2">
-                      {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {analyzeProgress}</> : <><Upload className="w-4 h-4" /> 获取并分析</>}
-                    </button>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between p-6 border-t border-gray-100">
+                      <div className="text-xs text-gray-400">
+                        {urlInput.trim() ? `${urlInput.split('\n').filter(l => l.trim()).length} 条链接` : '请粘贴链接'}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setShowImportModal(false)} className="btn-secondary">取消</button>
+                        <button onClick={handleParseUrls} disabled={!urlInput.trim()} className="btn-primary flex items-center gap-2">
+                          <Link2 className="w-4 h-4" /> 解析链接
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                      <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700 flex items-start gap-2">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        请补充每篇笔记的<strong>标题</strong>和<strong>内容</strong>（至少填这两项），AI 将基于真实内容进行分析。
+                      </div>
+                      {urlNotesList.map((item, i) => (
+                        <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono text-gray-500 truncate max-w-[300px]">{item.url}</span>
+                            <span className="text-xs text-gray-400">#{i + 1}</span>
+                          </div>
+                          <input
+                            type="text" placeholder="笔记标题 *" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={item.title} onChange={(e) => updateUrlNote(i, 'title', e.target.value)}
+                          />
+                          <textarea
+                            placeholder="笔记正文内容 *" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 resize-none"
+                            value={item.content} onChange={(e) => updateUrlNote(i, 'content', e.target.value)}
+                          />
+                          <div className="grid grid-cols-4 gap-2">
+                            <input type="text" placeholder="作者" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={item.author} onChange={(e) => updateUrlNote(i, 'author', e.target.value)} />
+                            <input type="number" placeholder="点赞" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={item.likes || ''} onChange={(e) => updateUrlNote(i, 'likes', parseInt(e.target.value) || 0)} />
+                            <input type="number" placeholder="收藏" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={item.collects || ''} onChange={(e) => updateUrlNote(i, 'collects', parseInt(e.target.value) || 0)} />
+                            <select className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={item.brand} onChange={(e) => updateUrlNote(i, 'brand', e.target.value)}>
+                              <option value="未提及">未提及</option><option value="BOLOLO">BOLOLO</option><option value="小白熊">小白熊</option><option value="新贝">新贝</option><option value="其它">其它</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between p-6 border-t border-gray-100">
+                      <button onClick={() => { setUrlEditStep(false); setUrlNotesList([]) }} className="text-xs text-gray-400 hover:text-gray-600">← 返回修改链接</button>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setShowImportModal(false)} className="btn-secondary">取消</button>
+                        <button onClick={handleUrlAnalyze} disabled={analyzing} className="btn-primary flex items-center gap-2">
+                          {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {analyzeProgress}</> : <><Sparkles className="w-4 h-4" /> 提交 AI 分析</>}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
