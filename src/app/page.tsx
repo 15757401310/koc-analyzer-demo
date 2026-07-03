@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from 'react'
 import { preAnalyzedNotes } from '@/lib/mock-data'
 import { AnalyzedNote, STRATEGY_LABELS, STRATEGY_COLORS, COVER_TYPE_LABELS } from '@/lib/types'
+import { analyzeNoteClient } from '@/lib/deepseek-client'
 import {
   BarChart3,
   Sparkles,
@@ -146,9 +147,9 @@ export default function Home() {
       const comments = newNote.comments
         ? newNote.comments.split('\n').filter(Boolean).map((c) => ({ content: c.trim(), likes: Math.floor(Math.random() * 20) }))
         : []
-      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newNote, comments, coverType: newNote.coverType, brandMentioned: newNote.brand }) })
-      if (!res.ok) throw new Error('分析失败')
-      const analyzed = await res.json()
+      const note = { id: `manual-${Date.now()}`, title: newNote.title, content: newNote.content, author: newNote.author, likes: newNote.likes, collects: newNote.collects, shares: newNote.shares, comments, coverType: newNote.coverType as any, brandMentioned: newNote.brand }
+      const analysis = await analyzeNoteClient(note)
+      const analyzed = { ...note, analysis, analyzedAt: new Date().toISOString() }
       setNotes((prev) => [analyzed, ...prev])
       setShowImportModal(false)
       setNewNote({ title: '', content: '', author: '', likes: 0, collects: 0, shares: 0, comments: '', coverType: 'review', brand: 'BOLOLO' })
@@ -179,7 +180,7 @@ export default function Home() {
         shares: 0,
         comments: [] as { content: string; likes: number }[],
         coverType: 'review' as const,
-        brand: '未提及',
+        brandMentioned: '未提及',
         url: urlObj,
       }
     })
@@ -189,11 +190,8 @@ export default function Home() {
     for (let i = 0; i < parsedNotes.length; i++) {
       setAnalyzeProgress(`正在分析第 ${i + 1}/${parsedNotes.length} 篇笔记...`)
       try {
-        const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedNotes[i]) })
-        if (res.ok) {
-          const analyzed = await res.json()
-          results.push(analyzed)
-        }
+        const analysis = await analyzeNoteClient(parsedNotes[i])
+        results.push({ ...parsedNotes[i], analysis, analyzedAt: new Date().toISOString() })
       } catch { /* skip failed */ }
     }
 
@@ -241,7 +239,7 @@ export default function Home() {
         shares: parseInt(shares) || 0,
         comments,
         coverType: coverType?.trim() || 'review',
-        brand: brand?.trim() || '未提及',
+        brandMentioned: brand?.trim() || '未提及',
       })
     }
 
@@ -251,11 +249,8 @@ export default function Home() {
     for (let i = 0; i < parsedNotes.length; i++) {
       setAnalyzeProgress(`正在分析第 ${i + 1}/${parsedNotes.length} 篇笔记...`)
       try {
-        const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedNotes[i]) })
-        if (res.ok) {
-          const analyzed = await res.json()
-          results.push(analyzed)
-        }
+        const analysis = await analyzeNoteClient(parsedNotes[i])
+        results.push({ ...parsedNotes[i], analysis, analyzedAt: new Date().toISOString() })
       } catch { /* skip */ }
     }
 
