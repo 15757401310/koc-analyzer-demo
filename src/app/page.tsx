@@ -4,7 +4,6 @@ import { useState, useMemo, useRef } from 'react'
 import { preAnalyzedNotes } from '@/lib/mock-data'
 import { AnalyzedNote, STRATEGY_LABELS, STRATEGY_COLORS, COVER_TYPE_LABELS } from '@/lib/types'
 import { analyzeNoteClient } from '@/lib/deepseek-client'
-import { fetchNotesFromUrls } from '@/lib/xhs-fetcher'
 import {
   BarChart3,
   Sparkles,
@@ -23,7 +22,6 @@ import {
   Filter,
   ArrowUpDown,
   Upload,
-  Link2,
   FileSpreadsheet,
   ChevronDown,
   Info,
@@ -41,7 +39,7 @@ import {
   Lightbulb,
 } from 'lucide-react'
 
-type ImportTab = 'manual' | 'url' | 'excel'
+type ImportTab = 'manual' | 'excel'
 
 export default function Home() {
   const [notes, setNotes] = useState<AnalyzedNote[]>(preAnalyzedNotes)
@@ -101,11 +99,6 @@ export default function Home() {
     brand: 'BOLOLO',
   })
 
-  // URL import state
-  const [urlInput, setUrlInput] = useState('')
-  const [urlEditStep, setUrlEditStep] = useState(false)
-  const [urlNotesList, setUrlNotesList] = useState<{url: string; noteId: string; title: string; content: string; author: string; likes: number; collects: number; shares: number; brand: string; fetchError?: string}[]>([])
-
   // Excel import state
   const [excelInput, setExcelInput] = useState('')
 
@@ -157,58 +150,6 @@ export default function Home() {
       setNewNote({ title: '', content: '', author: '', likes: 0, collects: 0, shares: 0, comments: '', coverType: 'review', brand: 'BOLOLO' })
     } catch { alert('分析失败，请重试') }
     finally { setAnalyzing(false); setAnalyzeProgress('') }
-  }
-
-  // === URL IMPORT ===
-  async function handleParseUrls() {
-    const urls = urlInput.split('\n').filter((l) => l.trim())
-    if (urls.length === 0) return
-    setAnalyzing(true)
-    setAnalyzeProgress('正在获取笔记内容...')
-    const fetched = await fetchNotesFromUrls(urls)
-    const list = urls.map((url, i) => {
-      const urlObj = url.trim()
-      const noteIdMatch = urlObj.match(/(?:explore|search_result|discovery\/item)\/([a-f0-9]+)/)
-      const noteId = noteIdMatch ? noteIdMatch[1].slice(0, 10) : `note-${i}`
-      const data = fetched[i]
-      return {
-        url: urlObj, noteId,
-        title: data?.success ? data.title : '',
-        content: data?.success ? data.content : (data?.error ? `[解析失败: ${data.error}]` : ''),
-        author: data?.author || '', likes: 0, collects: 0, shares: 0, brand: '未提及',
-        fetchError: data?.success === false ? (data.error || '解析失败') : '',
-      }
-    })
-    setUrlNotesList(list as any); setUrlEditStep(true); setAnalyzing(false); setAnalyzeProgress('')
-  }
-
-  function updateUrlNote(index: number, field: string, value: any) {
-    setUrlNotesList((prev) => prev.map((n, i) => (i === index ? { ...n, [field]: value } : n)))
-  }
-
-  async function handleUrlAnalyze() {
-    if (urlNotesList.length === 0) return
-    setAnalyzing(true)
-    const results: AnalyzedNote[] = []
-    for (let i = 0; i < urlNotesList.length; i++) {
-      const item = urlNotesList[i]
-      if (!item.title || !item.content) continue
-      setAnalyzeProgress(`正在分析第 ${i + 1}/${urlNotesList.length} 篇笔记...`)
-      try {
-        const note = {
-          id: `url-${item.noteId}-${Date.now()}`,
-          title: item.title, content: item.content, author: item.author || '未知作者',
-          likes: item.likes || 0, collects: item.collects || 0, shares: item.shares || 0,
-          comments: [] as { content: string; likes: number }[],
-          coverType: 'review' as const, brandMentioned: item.brand || '未提及', url: item.url,
-        }
-        const analysis = await analyzeNoteClient(note)
-        results.push({ ...note, analysis, analyzedAt: new Date().toISOString() })
-      } catch { /* skip */ }
-    }
-    if (results.length > 0) setNotes((prev) => [...results, ...prev])
-    else alert('没有可分析的笔记，请至少填写标题和内容')
-    setAnalyzing(false); setAnalyzeProgress(''); setUrlInput(''); setUrlNotesList([]); setUrlEditStep(false); setShowImportModal(false)
   }
 
   // === EXCEL IMPORT ===
@@ -746,7 +687,6 @@ export default function Home() {
             <div className="flex items-center border-b border-gray-100">
               {[
                 { key: 'manual' as ImportTab, icon: Plus, label: '手动填写' },
-                { key: 'url' as ImportTab, icon: Link2, label: '粘贴链接导入' },
                 { key: 'excel' as ImportTab, icon: FileSpreadsheet, label: 'Excel 批量导入' },
               ].map((tab) => (
                 <button
@@ -818,97 +758,6 @@ export default function Home() {
                     {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {analyzeProgress}</> : <><Sparkles className="w-4 h-4" /> 开始分析</>}
                   </button>
                 </div>
-              </>
-            )}
-
-            {/* === TAB: URL === */}
-            {importTab === 'url' && (
-              <>
-                {!urlEditStep ? (
-                  <>
-                    <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                      <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
-                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>
-                          粘贴小红书笔记链接，解析后需手动填写笔记内容，再提交 AI 分析。<br />
-                          <span className="text-blue-500">静态网页无法抓取小红书（跨域限制），接入蒲公英 API 后可跳过手动填写步骤。</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">小红书笔记链接</label>
-                        <textarea
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-40 resize-none font-mono text-xs"
-                          placeholder={`https://www.xiaohongshu.com/explore/69c34f0d0000000028008b46\nhttps://www.xiaohongshu.com/search_result/68e63b060000000007003e51\n每行一条链接`}
-                          value={urlInput}
-                          onChange={(e) => setUrlInput(e.target.value)}
-                        />
-                        <div className="text-xs text-gray-400 mt-1">支持 explore / search_result / discovery 格式，每行一条</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between p-6 border-t border-gray-100">
-                      <div className="text-xs text-gray-400">
-                        {urlInput.trim() ? `${urlInput.split('\n').filter(l => l.trim()).length} 条链接` : '请粘贴链接'}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => setShowImportModal(false)} className="btn-secondary">取消</button>
-                        <button onClick={handleParseUrls} disabled={analyzing || !urlInput.trim()} className="btn-primary flex items-center gap-2">
-                          {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {analyzeProgress}</> : <><Link2 className="w-4 h-4" /> 解析链接</>}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                      <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700 flex items-start gap-2">
-                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>已通过 CORS 代理尝试获取笔记元数据。成功获取的内容已自动填入，无法获取的字段请手动补充。<br />至少填写<strong>标题</strong>和<strong>内容</strong>即可提交分析。</div>
-                      </div>
-                      {urlNotesList.map((item, i) => (
-                        <div key={i} className={`border rounded-lg p-3 space-y-2 ${item.fetchError ? 'border-red-200 bg-red-50/50' : 'border-gray-200'}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono text-gray-500 truncate max-w-[280px]">{item.url}</span>
-                            <div className="flex items-center gap-2">
-                              {item.fetchError && <span className="text-xs text-red-500" title={item.fetchError}>⚠️ 解析失败</span>}
-                              {!item.fetchError && item.title && <span className="text-xs text-green-500">✅ 已获取</span>}
-                              <span className="text-xs text-gray-400">#{i + 1}</span>
-                            </div>
-                          </div>
-                          {item.fetchError && <div className="text-xs text-red-500 bg-red-100 rounded px-2 py-1">{item.fetchError}</div>}
-                          <input
-                            type="text" placeholder="笔记标题 *" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={item.title} onChange={(e) => updateUrlNote(i, 'title', e.target.value)}
-                          />
-                          <textarea
-                            placeholder="笔记正文内容 *" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 resize-none"
-                            value={item.content} onChange={(e) => updateUrlNote(i, 'content', e.target.value)}
-                          />
-                          <div className="grid grid-cols-4 gap-2">
-                            <input type="text" placeholder="作者" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              value={item.author} onChange={(e) => updateUrlNote(i, 'author', e.target.value)} />
-                            <input type="number" placeholder="点赞" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              value={item.likes || ''} onChange={(e) => updateUrlNote(i, 'likes', parseInt(e.target.value) || 0)} />
-                            <input type="number" placeholder="收藏" className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              value={item.collects || ''} onChange={(e) => updateUrlNote(i, 'collects', parseInt(e.target.value) || 0)} />
-                            <select className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              value={item.brand} onChange={(e) => updateUrlNote(i, 'brand', e.target.value)}>
-                              <option value="未提及">未提及</option><option value="BOLOLO">BOLOLO</option><option value="小白熊">小白熊</option><option value="新贝">新贝</option><option value="其它">其它</option>
-                            </select>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between p-6 border-t border-gray-100">
-                      <button onClick={() => { setUrlEditStep(false); setUrlNotesList([]) }} className="text-xs text-gray-400 hover:text-gray-600">← 返回修改链接</button>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => setShowImportModal(false)} className="btn-secondary">取消</button>
-                        <button onClick={handleUrlAnalyze} disabled={analyzing} className="btn-primary flex items-center gap-2">
-                          {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {analyzeProgress}</> : <><Sparkles className="w-4 h-4" /> 提交 AI 分析</>}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
               </>
             )}
 
