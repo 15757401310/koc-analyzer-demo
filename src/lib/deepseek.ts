@@ -4,7 +4,8 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
 const MODEL = 'deepseek-chat'
 
 export async function analyzeNote(note: KocNote): Promise<AnalysisResult> {
-  const apiKey = process.env.DEEPSEEK_API_KEY
+  // Strip BOM and whitespace from env var (defensive against platform encoding issues)
+  const apiKey = (process.env.DEEPSEEK_API_KEY || '').replace(/^﻿/, '').trim()
 
   if (!apiKey) {
     throw new Error('DEEPSEEK_API_KEY not configured')
