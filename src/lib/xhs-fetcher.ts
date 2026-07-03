@@ -1,10 +1,11 @@
 // Fetch Xiaohongshu note metadata via CORS proxy
-// Note: XHS pages are client-rendered, so we can only extract SEO metadata.
-// Full content scraping requires Puppeteer + backend server (蒲公英API in production).
+// Note: XHS pages are client-rendered, only SEO metadata is accessible.
+// Full content requires 蒲公英API (enterprise) or headless browser (server-side).
+// Free CORS proxies are unreliable — success depends on proxy uptime and XHS anti-bot.
 
 const CORS_PROXIES = [
-  'https://api.allorigins.win/raw?url=',
-  'https://corsproxy.io/?',
+  { url: 'https://corsproxy.io/?', type: 'prefix' },
+  { url: 'https://api.allorigins.win/raw?url=', type: 'prefix' },
 ]
 
 interface FetchedNote {
