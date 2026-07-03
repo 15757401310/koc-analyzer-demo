@@ -38,7 +38,12 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Analysis error:', error)
     return NextResponse.json(
-      { error: error.message || '分析失败，请稍后重试' },
+      {
+        error: error.message || '分析失败，请稍后重试',
+        detail: error.cause || error.stack || '',
+        hasApiKey: !!process.env.DEEPSEEK_API_KEY,
+        apiKeyPrefix: process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.substring(0, 8) + '...' : 'NOT SET',
+      },
       { status: 500 }
     )
   }
