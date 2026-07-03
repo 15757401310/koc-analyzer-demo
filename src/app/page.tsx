@@ -430,7 +430,7 @@ export default function Home() {
         {/* ==================== STRATEGY SIDEBAR ==================== */}
         {showStrategy && (
           <aside className="w-80 shrink-0 hidden xl:block">
-            <div className="sticky top-24 space-y-4">
+            <div className="space-y-4">
 
               {/* Section 1: AI决策流程 */}
               <div className="card p-4">
