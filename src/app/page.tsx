@@ -164,16 +164,16 @@ export default function Home() {
     setAnalyzing(true)
     setAnalyzeProgress(`正在解析 ${urls.length} 条链接...`)
 
-    // For demo: extract note ID from URL and simulate content
-    // In production, this would call Xiaohongshu API /蒲公英API
+    // Demo: extract note ID from URL. Production would use 蒲公英API to fetch real note data.
     const parsedNotes = urls.map((url, i) => {
       const urlObj = url.trim()
-      const noteIdMatch = urlObj.match(/search_result\/([a-f0-9]+)/)
+      // Support explore/, search_result/, discovery/item/ URL formats
+      const noteIdMatch = urlObj.match(/(?:explore|search_result|discovery\/item)\/([a-f0-9]+)/)
       const noteId = noteIdMatch ? noteIdMatch[1].slice(0, 8) : `note-${i}`
       return {
         id: `url-${noteId}-${Date.now()}`,
         title: `小红书笔记 ${noteId}`,
-        content: `请手动补充笔记内容。链接: ${urlObj}`,
+        content: `[Demo模式] 该笔记内容需手动补充。\n链接: ${urlObj}\n\n说明：静态网页无法抓取小红书内容（浏览器跨域限制）。接入蒲公英 API 后可自动获取笔记标题、正文、互动数据。`,
         author: '待补充',
         likes: 0,
         collects: 0,
@@ -823,18 +823,20 @@ export default function Home() {
                 <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                   <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
                     <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                    粘贴小红书笔记链接，每行一条。系统将自动获取笔记信息并 AI 分析投流价值。<br />
-                    当前为 Demo 版本，链接解析为模拟数据，接入聚光/蒲公英 API 后可获取真实笔记数据。
+                    <div>
+                      粘贴小红书笔记链接，每行一条。系统将提取笔记 ID 并调用 AI 分析投流价值。<br />
+                      <span className="text-blue-500">Demo 模式：因静态网页无法爬取小红书（跨域限制），笔记标题和内容需手动补充。接入蒲公英 API 后可自动获取。</span>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">小红书笔记链接</label>
                     <textarea
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-40 resize-none font-mono text-xs"
-                      placeholder={`https://www.xiaohongshu.com/explore/abc123\nhttps://www.xiaohongshu.com/explore/def456\nhttps://www.xiaohongshu.com/explore/ghi789`}
+                      placeholder={`https://www.xiaohongshu.com/explore/69c34f0d0000000028008b46\nhttps://www.xiaohongshu.com/search_result/68e63b060000000007003e51\n每行一条链接`}
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
                     />
-                    <div className="text-xs text-gray-400 mt-1">每行一条链接，支持 explore 和 search_result 格式</div>
+                    <div className="text-xs text-gray-400 mt-1">每行一条链接，支持 explore / search_result / discovery 格式</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-between p-6 border-t border-gray-100">
