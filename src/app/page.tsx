@@ -29,6 +29,14 @@ import {
   Check,
   Trash2,
   RotateCcw,
+  PanelRightOpen,
+  PanelRightClose,
+  GitBranch,
+  Gauge,
+  ListChecks,
+  ArrowRight,
+  CircleDot,
+  Lightbulb,
 } from 'lucide-react'
 
 type ImportTab = 'manual' | 'url' | 'excel'
@@ -45,6 +53,19 @@ export default function Home() {
   const [analyzeProgress, setAnalyzeProgress] = useState('')
   const [copied, setCopied] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [showStrategy, setShowStrategy] = useState(true)
+
+  const strategyStats = useMemo(() => {
+    const aq = notes.filter((n) => n.analysis.strategy === 'acquisition')
+    const rt = notes.filter((n) => n.analysis.strategy === 'retention')
+    const both = notes.filter((n) => n.analysis.strategy === 'both')
+    const nr = notes.filter((n) => n.analysis.strategy === 'not_recommended')
+    const high = notes.filter((n) => n.analysis.score >= 80)
+    const mid = notes.filter((n) => n.analysis.score >= 60 && n.analysis.score < 80)
+    const low = notes.filter((n) => n.analysis.score >= 40 && n.analysis.score < 60)
+    const bad = notes.filter((n) => n.analysis.score < 40)
+    return { aq: aq.length, rt: rt.length, both: both.length, nr: nr.length, high: high.length, mid: mid.length, low: low.length, bad: bad.length }
+  }, [notes])
 
   const hasImportedNotes = notes.length > preAnalyzedNotes.length
   const isModified = notes.length !== preAnalyzedNotes.length || notes.some((n, i) => n.id !== preAnalyzedNotes[i]?.id)
@@ -306,7 +327,10 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
+        <div className={`flex gap-6 ${showStrategy ? '' : ''}`}>
+        {/* Left content area */}
+        <div className="flex-1 min-w-0">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
@@ -323,8 +347,18 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Filters */}
+        {/* Filters + Strategy toggle */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
+          <button
+            onClick={() => setShowStrategy(!showStrategy)}
+            className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
+              showStrategy ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+            title={showStrategy ? '收起策略面板' : '展开策略面板'}
+          >
+            {showStrategy ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            投流策略{showStrategy ? '' : ''}
+          </button>
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="搜索笔记、关键词、品牌..." className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -346,7 +380,7 @@ export default function Home() {
         </div>
 
         {/* Note Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${showStrategy ? 'xl:grid-cols-2' : 'lg:grid-cols-3'} gap-4`}>
           {filteredNotes.map((note) => (
             <div key={note.id} className={`card p-5 relative group ${scoreBg(note.analysis.score)}`}>
               <button
@@ -391,6 +425,146 @@ export default function Home() {
             <p>没有匹配的笔记，试试调整筛选条件</p>
           </div>
         )}
+        </div>{/* end left content */}
+
+        {/* ==================== STRATEGY SIDEBAR ==================== */}
+        {showStrategy && (
+          <aside className="w-80 shrink-0 hidden xl:block">
+            <div className="sticky top-24 space-y-4">
+
+              {/* Section 1: AI决策流程 */}
+              <div className="card p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-800 mb-4">
+                  <GitBranch className="w-4 h-4 text-blue-600" /> AI 投流决策流程
+                </div>
+                <div className="space-y-0">
+                  {[
+                    { icon: Upload, label: '内容导入', desc: 'KOC笔记数据汇聚', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+                    { icon: Search, label: '多维评估', desc: '内容质量 · 评论意向 · 关键词覆盖 · 品牌匹配', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+                    { icon: Target, label: '策略分类', desc: '拉新 / 收割 / 两者皆可 / 不推荐', color: 'bg-amber-50 border-amber-200 text-amber-700' },
+                    { icon: Zap, label: '预算建议', desc: '基于评分自动匹配日预算区间', color: 'bg-green-50 border-green-200 text-green-700' },
+                  ].map((step, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${step.color}`}>
+                          <step.icon className="w-4 h-4" />
+                        </div>
+                        {i < 3 && <div className="w-0.5 h-5 bg-gray-200 my-1" />}
+                      </div>
+                      <div className="pb-3">
+                        <div className="text-sm font-medium text-gray-800">{step.label}</div>
+                        <div className="text-xs text-gray-500">{step.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 2: 策略分类标准 */}
+              <div className="card p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-800 mb-3">
+                  <ListChecks className="w-4 h-4 text-blue-600" /> 策略分类标准
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { strategy: 'acquisition', icon: '🎯', label: '拉新', desc: '对新用户吸引力\n> 70 分', color: 'border-blue-300 bg-blue-50' },
+                    { strategy: 'retention', icon: '🔄', label: '收割', desc: '对老用户转化力\n> 70 分', color: 'border-amber-300 bg-amber-50' },
+                    { strategy: 'both', icon: '🔀', label: '拉新+收割', desc: '两者都\n> 60 分', color: 'border-green-300 bg-green-50' },
+                    { strategy: 'not_recommended', icon: '⛔', label: '不推荐', desc: '评分 < 40\n或有负面信号', color: 'border-gray-300 bg-gray-50' },
+                  ].map((s) => (
+                    <div key={s.strategy} className={`p-2.5 rounded-lg border ${s.color} text-center`}>
+                      <div className="text-lg">{s.icon}</div>
+                      <div className="text-xs font-bold text-gray-800 mt-0.5">{s.label}</div>
+                      <div className="text-xs text-gray-500 whitespace-pre-line leading-tight mt-0.5">{s.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 3: 预算分配模型 */}
+              <div className="card p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-800 mb-3">
+                  <Gauge className="w-4 h-4 text-blue-600" /> 预算分配模型
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { range: '80-100 分', budget: '¥300-500/天', label: '主力投流', color: 'bg-green-100 border-green-300', dot: 'bg-green-500', width: 'w-full' },
+                    { range: '60-79 分', budget: '¥150-300/天', label: '常规投流', color: 'bg-amber-100 border-amber-300', dot: 'bg-amber-500', width: 'w-3/4' },
+                    { range: '40-59 分', budget: '¥50-150/天', label: '小预算测试', color: 'bg-orange-100 border-orange-300', dot: 'bg-orange-500', width: 'w-2/4' },
+                    { range: '< 40 分', budget: '¥0', label: '不投流', color: 'bg-gray-100 border-gray-300', dot: 'bg-gray-400', width: 'w-1/4' },
+                  ].map((tier) => (
+                    <div key={tier.range} className={`flex items-center gap-3 p-2.5 rounded-lg border ${tier.color}`}>
+                      <div className={`w-2.5 h-2.5 rounded-full ${tier.dot} shrink-0`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-800">{tier.range}</span>
+                          <span className="text-xs font-bold text-gray-800">{tier.budget}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={`h-full ${tier.dot} rounded-full ${tier.width}`} />
+                          </div>
+                          <span className="text-xs text-gray-500">{tier.label}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-1.5 mt-3 p-2 bg-amber-50 rounded-lg border border-amber-100">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    评分 <strong>80+</strong> 的笔记应占投流总预算的 <strong>60%以上</strong>，优先保头部内容放量。
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 4: 当前数据实时概览 */}
+              <div className="card p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-800 mb-3">
+                  <BarChart3 className="w-4 h-4 text-blue-600" /> 当前看板数据分布
+                </div>
+                {/* Strategy distribution */}
+                <div className="mb-3">
+                  <div className="text-xs text-gray-500 mb-2">策略分布</div>
+                  <div className="flex h-3 rounded-full overflow-hidden">
+                    {strategyStats.aq > 0 && <div className="bg-blue-400" style={{ width: `${(strategyStats.aq / notes.length) * 100}%` }} title={`拉新 ${strategyStats.aq}篇`} />}
+                    {strategyStats.rt > 0 && <div className="bg-amber-400" style={{ width: `${(strategyStats.rt / notes.length) * 100}%` }} title={`收割 ${strategyStats.rt}篇`} />}
+                    {strategyStats.both > 0 && <div className="bg-green-400" style={{ width: `${(strategyStats.both / notes.length) * 100}%` }} title={`拉新+收割 ${strategyStats.both}篇`} />}
+                    {strategyStats.nr > 0 && <div className="bg-gray-300" style={{ width: `${(strategyStats.nr / notes.length) * 100}%` }} title={`不推荐 ${strategyStats.nr}篇`} />}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> 拉新 {strategyStats.aq}</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> 收割 {strategyStats.rt}</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> 双策略 {strategyStats.both}</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> 不推荐 {strategyStats.nr}</span>
+                  </div>
+                </div>
+                {/* Score distribution */}
+                <div>
+                  <div className="text-xs text-gray-500 mb-2">评分分布</div>
+                  <div className="space-y-1">
+                    {[
+                      { label: '80+', count: strategyStats.high, color: 'bg-green-500' },
+                      { label: '60-79', count: strategyStats.mid, color: 'bg-amber-500' },
+                      { label: '40-59', count: strategyStats.low, color: 'bg-orange-500' },
+                      { label: '<40', count: strategyStats.bad, color: 'bg-red-500' },
+                    ].map((b) => (
+                      <div key={b.label} className="flex items-center gap-2 text-xs">
+                        <span className="w-8 text-right text-gray-500">{b.label}</span>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${b.color} rounded-full`} style={{ width: `${notes.length > 0 ? (b.count / notes.length) * 100 : 0}%` }} />
+                        </div>
+                        <span className="w-6 text-gray-700 font-medium">{b.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </aside>
+        )}
+        </div>{/* end flex row */}
       </main>
 
       {/* Detail Modal */}
